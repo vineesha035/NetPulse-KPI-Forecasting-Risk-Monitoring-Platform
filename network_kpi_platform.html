@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetPulse · Network Traffic Forecasting & KPI Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #03050a;
+    --surface: #080d18;
+    --surface2: #0d1525;
+    --surface3: #111c30;
+    --border: #1a2a45;
+    --border2: #1f3358;
+    --accent: #00d4ff;
+    --accent2: #0099cc;
+    --accent3: #00ff88;
+    --accent4: #ff6b35;
+    --accent5: #a855f7;
+    --warn: #ffb800;
+    --danger: #ff3366;
+    --text: #e2eaf8;
+    --text2: #8ba3c7;
+    --text3: #4d6a94;
+    --glow: 0 0 20px rgba(0,212,255,0.15);
+    --glow2: 0 0 40px rgba(0,212,255,0.08);
+    --mono: 'Space Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ANIMATED GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(0,212,255,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(168,85,247,0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 20s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift {
+    from { transform: translate(0,0) rotate(0deg); }
+    to { transform: translate(30px, 20px) rotate(2deg); }
+  }
+
+  /* TOP NAV */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 52px;
+    background: rgba(3,5,10,0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .nav-logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent3); animation: blink 1.5s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .nav-center {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .nav-tab {
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text2);
+    font-size: 11px;
+    font-family: var(--mono);
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+
+  .nav-tab:hover { color: var(--text); background: var(--surface2); }
+  .nav-tab.active { color: var(--accent); border-color: var(--border2); background: var(--surface2); }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--accent3);
+    letter-spacing: 1px;
+  }
+
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent3);
+    animation: blink 1s ease-in-out infinite;
+  }
+
+  .stakeholder-count {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.5px;
+  }
+
+  /* MAIN LAYOUT */
+  .main {
+    position: relative;
+    z-index: 1;
+    padding: 16px 20px 32px;
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+
+  /* SECTION HEADERS */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    margin-top: 20px;
+  }
+
+  .section-title {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--text2);
+    text-transform: uppercase;
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border2), transparent);
+  }
+
+  .section-badge {
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border2);
+    color: var(--text3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* KPI STRIP */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0.6;
+  }
+
+  .kpi-card.green::before { background: linear-gradient(90deg, var(--accent3), transparent); }
+  .kpi-card.orange::before { background: linear-gradient(90deg, var(--accent4), transparent); }
+  .kpi-card.purple::before { background: linear-gradient(90deg, var(--accent5), transparent); }
+  .kpi-card.yellow::before { background: linear-gradient(90deg, var(--warn), transparent); }
+  .kpi-card.red::before { background: linear-gradient(90deg, var(--danger), transparent); }
+
+  .kpi-label {
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .kpi-value {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .kpi-unit {
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  .kpi-delta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .kpi-delta.up { color: var(--accent3); }
+  .kpi-delta.down { color: var(--danger); }
+  .kpi-delta.neutral { color: var(--text3); }
+
+  .kpi-sparkline {
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 60px; height: 30px;
+    opacity: 0.4;
+  }
+
+  /* MAIN CHARTS GRID */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .panel-title {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .panel-subtitle {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.5px;
+  }
+
+  .panel-controls {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .pill-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+  }
+
+  .pill-btn:hover, .pill-btn.active {
+    border-color: var(--accent2);
+    color: var(--accent);
+    background: rgba(0,153,204,0.1);
+  }
+
+  canvas { border-radius: 4px; }
+
+  /* FORECAST MODEL PANEL */
+  .model-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.2fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  /* FEATURE PIPELINE */
+  .pipeline-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+
+  .feature-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 9px;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s;
+    cursor: default;
+  }
+
+  .feature-chip:hover {
+    border-color: var(--accent2);
+    color: var(--accent);
+    background: rgba(0,153,204,0.08);
+  }
+
+  .feature-chip .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .feature-chip .importance {
+    margin-left: auto;
+    color: var(--text3);
+    font-size: 8px;
+  }
+
+  /* TABLE */
+  .table-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow: hidden;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  thead th {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(26,42,69,0.5);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: var(--surface2); }
+
+  tbody td {
+    padding: 8px 10px;
+    color: var(--text2);
+    font-size: 10px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+  }
+
+  .status-badge.ok { background: rgba(0,255,136,0.1); color: var(--accent3); border: 1px solid rgba(0,255,136,0.2); }
+  .status-badge.warn { background: rgba(255,184,0,0.1); color: var(--warn); border: 1px solid rgba(255,184,0,0.2); }
+  .status-badge.alert { background: rgba(255,51,102,0.1); color: var(--danger); border: 1px solid rgba(255,51,102,0.2); }
+
+  /* BOTTOM GRID */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  /* MODEL STATS */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(26,42,69,0.5);
+  }
+
+  .stat-row:last-child { border-bottom: none; }
+
+  .stat-label { font-size: 10px; color: var(--text3); }
+  .stat-val { font-size: 12px; color: var(--text); font-family: var(--mono); }
+  .stat-val.good { color: var(--accent3); }
+  .stat-val.warn { color: var(--warn); }
+
+  .progress-bar {
+    height: 3px;
+    background: var(--surface3);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  /* ANOMALY LOG */
+  .anomaly-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(26,42,69,0.4);
+    align-items: flex-start;
+  }
+
+  .anomaly-item:last-child { border-bottom: none; }
+
+  .anomaly-icon {
+    width: 28px; height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .anomaly-icon.high { background: rgba(255,51,102,0.15); }
+  .anomaly-icon.med { background: rgba(255,184,0,0.12); }
+  .anomaly-icon.low { background: rgba(0,212,255,0.1); }
+
+  .anomaly-body { flex: 1; }
+  .anomaly-title { font-size: 11px; color: var(--text); margin-bottom: 2px; }
+  .anomaly-meta { font-size: 9px; color: var(--text3); letter-spacing: 0.3px; }
+
+  /* SPARK BARS */
+  .spark-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+  }
+
+  .spark-bar-label { font-size: 10px; color: var(--text2); width: 90px; flex-shrink: 0; }
+  .spark-bar-track { flex: 1; height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+  .spark-bar-fill { height: 100%; border-radius: 2px; }
+  .spark-bar-val { font-size: 10px; color: var(--text3); width: 42px; text-align: right; flex-shrink: 0; }
+
+  /* SARIMAX PARAMS */
+  .param-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .param-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 12px;
+  }
+
+  .param-name { font-size: 9px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+  .param-val { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--accent); }
+  .param-desc { font-size: 9px; color: var(--text3); margin-top: 2px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* TABS */
+  .view-tabs { display: none; }
+  .view-tabs.active { display: block; }
+
+  /* REALTIME TICKER */
+  .ticker-bar {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    position: relative;
+  }
+
+  .ticker-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--text3);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding-right: 16px;
+  }
+
+  .ticker-items {
+    display: flex;
+    gap: 32px;
+    animation: ticker 40s linear infinite;
+    white-space: nowrap;
+  }
+
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  .ticker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+  }
+
+  .ticker-item .node { color: var(--accent); }
+  .ticker-item .val { color: var(--text); }
+  .ticker-item .chg.up { color: var(--accent3); }
+  .ticker-item .chg.down { color: var(--danger); }
+
+  /* FORECAST ACCURACY METER */
+  .accuracy-ring {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .ring-container {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    margin-bottom: 10px;
+  }
+
+  .ring-svg { transform: rotate(-90deg); }
+
+  .ring-val {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ring-num {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent3);
+  }
+
+  .ring-pct { font-size: 9px; color: var(--text3); }
+
+  /* ANIMATION */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .kpi-card, .chart-panel, .pipeline-panel, .table-panel, .anomaly-item {
+    animation: fadeInUp 0.5s ease forwards;
+  }
+
+  /* RESPONSIVE COMPRESS */
+  @media (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+    .charts-grid { grid-template-columns: 1fr; }
+    .model-grid { grid-template-columns: 1fr 1fr; }
+    .feature-grid { grid-template-columns: repeat(4, 1fr); }
+    .bottom-grid { grid-template-columns: 1fr; }
+  }
+
+  /* HIGHLIGHT PULSE */
+  @keyframes highlight {
+    0% { background: rgba(0,212,255,0.15); }
+    100% { background: transparent; }
+  }
+
+  .updated { animation: highlight 1s ease-out; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">
+    <div class="dot"></div>
+    NetPulse
+  </div>
+  <div class="nav-center">
+    <div class="nav-tab active" onclick="showTab('dashboard')">Dashboard</div>
+    <div class="nav-tab" onclick="showTab('forecast')">Forecast Engine</div>
+    <div class="nav-tab" onclick="showTab('pipeline')">Feature Pipeline</div>
+    <div class="nav-tab" onclick="showTab('model')">Model Registry</div>
+    <div class="nav-tab" onclick="showTab('alerts')">Anomaly Log</div>
+  </div>
+  <div class="nav-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+    <div class="stakeholder-count" id="stakeholder-count">213 stakeholders active</div>
+    <div style="font-size:10px;color:var(--text3)" id="clock"></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TICKER -->
+  <div class="ticker-bar">
+    <div class="ticker-label">NODE FEED</div>
+    <div class="ticker-items" id="ticker-items"></div>
+  </div>
+
+  <!-- TAB: DASHBOARD -->
+  <div id="tab-dashboard" class="view-tabs active">
+
+    <!-- KPI STRIP -->
+    <div class="section-header">
+      <div class="section-title">Real-Time KPIs</div>
+      <div class="section-line"></div>
+      <div class="section-badge">AUTO-REFRESH 5s</div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card" id="kpi-throughput">
+        <div class="kpi-label">Total Throughput</div>
+        <div class="kpi-value" id="v-throughput">847.3</div>
+        <div class="kpi-unit">Gbps</div>
+        <div class="kpi-delta up" id="d-throughput">▲ 3.2%</div>
+        <canvas class="kpi-sparkline" id="sp-0"></canvas>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Availability</div>
+        <div class="kpi-value" id="v-avail">99.97</div>
+        <div class="kpi-unit">%</div>
+        <div class="kpi-delta up" id="d-avail">▲ 0.01%</div>
+        <canvas class="kpi-sparkline" id="sp-1"></canvas>
+      </div>
+      <div class="kpi-card orange">
+        <div class="kpi-label">Packet Loss</div>
+        <div class="kpi-value" id="v-loss">0.018</div>
+        <div class="kpi-unit">%</div>
+        <div class="kpi-delta up" id="d-loss">▼ 0.003%</div>
+        <canvas class="kpi-sparkline" id="sp-2"></canvas>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Latency</div>
+        <div class="kpi-value" id="v-latency">14.2</div>
+        <div class="kpi-unit">ms</div>
+        <div class="kpi-delta down" id="d-latency">▲ 1.1ms</div>
+        <canvas class="kpi-sparkline" id="sp-3"></canvas>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">Active Flows</div>
+        <div class="kpi-value" id="v-flows">2.34</div>
+        <div class="kpi-unit">M</div>
+        <div class="kpi-delta up" id="d-flows">▲ 4.7%</div>
+        <canvas class="kpi-sparkline" id="sp-4"></canvas>
+      </div>
+      <div class="kpi-card yellow">
+        <div class="kpi-label">Forecast MAPE</div>
+        <div class="kpi-value" id="v-mape">3.81</div>
+        <div class="kpi-unit">%</div>
+        <div class="kpi-delta up" id="d-mape">▼ 0.2%</div>
+        <canvas class="kpi-sparkline" id="sp-5"></canvas>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">Anomalies</div>
+        <div class="kpi-value" id="v-anom">7</div>
+        <div class="kpi-unit">detected</div>
+        <div class="kpi-delta down" id="d-anom">▲ 3 new</div>
+        <canvas class="kpi-sparkline" id="sp-6"></canvas>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Model Accuracy</div>
+        <div class="kpi-value" id="v-acc">96.2</div>
+        <div class="kpi-unit">%</div>
+        <div class="kpi-delta up" id="d-acc">▲ 0.4%</div>
+        <canvas class="kpi-sparkline" id="sp-7"></canvas>
+      </div>
+    </div>
+
+    <!-- MAIN CHARTS -->
+    <div class="section-header">
+      <div class="section-title">Traffic Telemetry & Forecast</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Network Traffic + SARIMAX Forecast</div>
+            <div class="panel-subtitle">Actual vs Predicted (95% CI) — Updated every 5s</div>
+          </div>
+          <div class="panel-controls">
+            <button class="pill-btn active" onclick="setWindow(this,'1H')">1H</button>
+            <button class="pill-btn" onclick="setWindow(this,'6H')">6H</button>
+            <button class="pill-btn" onclick="setWindow(this,'24H')">24H</button>
+            <button class="pill-btn" onclick="setWindow(this,'7D')">7D</button>
+          </div>
+        </div>
+        <canvas id="main-chart" height="200"></canvas>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Traffic by Protocol</div>
+            <div class="panel-subtitle">Live distribution</div>
+          </div>
+        </div>
+        <canvas id="proto-chart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- BOTTOM ROW -->
+    <div class="bottom-grid">
+      <div class="chart-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Regional Traffic Heatmap</div>
+            <div class="panel-subtitle">Gbps by PoP · last 30min</div>
+          </div>
+        </div>
+        <canvas id="heat-chart" height="180"></canvas>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Anomaly Detection</div>
+            <div class="panel-subtitle">Z-Score > 2.5σ threshold</div>
+          </div>
+        </div>
+        <canvas id="anom-chart" height="180"></canvas>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Forecast Accuracy (7-day)</div>
+            <div class="panel-subtitle">MAPE per model horizon</div>
+          </div>
+        </div>
+        <canvas id="acc-chart" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- NODE STATUS TABLE -->
+    <div class="section-header">
+      <div class="section-title">Node Status</div>
+      <div class="section-line"></div>
+      <div class="section-badge" id="node-update-ts">Updating...</div>
+    </div>
+    <div class="table-panel">
+      <table>
+        <thead>
+          <tr>
+            <th>Node ID</th>
+            <th>Region</th>
+            <th>Throughput</th>
+            <th>Utilization</th>
+            <th>Latency</th>
+            <th>Loss</th>
+            <th>Forecast ±</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="node-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB: FORECAST ENGINE -->
+  <div id="tab-forecast" class="view-tabs">
+    <div class="section-header">
+      <div class="section-title">SARIMAX Model Configuration</div>
+      <div class="section-line"></div>
+      <div class="section-badge">SARIMA(2,1,2)(1,1,1)₂₄</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:12px;margin-bottom:12px">
+      <div class="chart-panel">
+        <div class="panel-title" style="margin-bottom:14px">Model Parameters</div>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-name">p (AR)</div>
+            <div class="param-val">2</div>
+            <div class="param-desc">Autoregressive order</div>
+          </div>
+          <div class="param-card">
+            <div class="param-name">d (I)</div>
+            <div class="param-val">1</div>
+            <div class="param-desc">Differencing</div>
+          </div>
+          <div class="param-card">
+            <div class="param-name">q (MA)</div>
+            <div class="param-val">2</div>
+            <div class="param-desc">Moving average</div>
+          </div>
+          <div class="param-card">
+            <div class="param-name">P (SAR)</div>
+            <div class="param-val">1</div>
+            <div class="param-desc">Seasonal AR</div>
+          </div>
+          <div class="param-card">
+            <div class="param-name">D (SI)</div>
+            <div class="param-val">1</div>
+            <div class="param-desc">Seasonal diff</div>
+          </div>
+          <div class="param-card">
+            <div class="param-name">Q (SMA)</div>
+            <div class="param-val">1</div>
+            <div class="param-desc">Seasonal MA</div>
+          </div>
+          <div class="param-card">
+            <div class="param-name">S (Period)</div>
+            <div class="param-val">24</div>
+            <div class="param-desc">Hourly seasonality</div>
+          </div>
+          <div class="param-card">
+            <div class="param-name">Exog X</div>
+            <div class="param-val">40+</div>
+            <div class="param-desc">Feature covariates</div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-label">AIC Score</div>
+          <div class="stat-val good" id="aic-val">2,341.7</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-label">BIC Score</div>
+          <div class="stat-val good" id="bic-val">2,389.4</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-label">Log-Likelihood</div>
+          <div class="stat-val" id="ll-val">-1,162.8</div>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="panel-title" style="margin-bottom:14px">Model Performance</div>
+        <div class="accuracy-ring">
+          <div class="ring-container">
+            <svg class="ring-svg" width="100" height="100" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="var(--surface3)" stroke-width="8"/>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="var(--accent3)" stroke-width="8"
+                stroke-dasharray="251.3"
+                stroke-dashoffset="9.5"
+                stroke-linecap="round"
+                id="acc-ring"/>
+            </svg>
+            <div class="ring-val">
+              <div class="ring-num" id="ring-acc">96.2%</div>
+              <div class="ring-pct">Accuracy</div>
+            </div>
+          </div>
+        </div>
+        <div class="stat-row"><div class="stat-label">MAPE</div><div class="stat-val good" id="s-mape">3.81%</div></div>
+        <div class="stat-row"><div class="stat-label">RMSE</div><div class="stat-val" id="s-rmse">12.34 Gbps</div></div>
+        <div class="stat-row"><div class="stat-label">MAE</div><div class="stat-val" id="s-mae">8.92 Gbps</div></div>
+        <div class="stat-row"><div class="stat-label">R²</div><div class="stat-val good" id="s-r2">0.9742</div></div>
+        <div class="stat-row"><div class="stat-label">Coverage (95% CI)</div><div class="stat-val good">94.8%</div></div>
+        <div class="stat-row"><div class="stat-label">Last Retrain</div><div class="stat-val" id="last-retrain">2h 14m ago</div></div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Forecast: 24-Hour Horizon</div>
+            <div class="panel-subtitle">Point forecast + confidence intervals</div>
+          </div>
+        </div>
+        <canvas id="horizon-chart" height="260"></canvas>
+      </div>
+    </div>
+
+    <!-- Residuals + ACF -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="chart-panel">
+        <div class="panel-header"><div class="panel-title">Residuals Distribution</div></div>
+        <canvas id="resid-chart" height="200"></canvas>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-header"><div class="panel-title">ACF / PACF Correlogram</div></div>
+        <canvas id="acf-chart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: FEATURE PIPELINE -->
+  <div id="tab-pipeline" class="view-tabs">
+    <div class="section-header">
+      <div class="section-title">Spark SQL Feature Engineering Pipeline</div>
+      <div class="section-line"></div>
+      <div class="section-badge">42 FEATURES</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="pipeline-panel">
+        <div style="font-family:var(--display);font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)">Feature Importance Rankings</div>
+        <div id="feature-importance-bars"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-header"><div class="panel-title">Feature Categories</div></div>
+        <canvas id="feature-cat-chart" height="220"></canvas>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">All 42 Engineered Features</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="pipeline-panel">
+      <div class="feature-grid" id="feature-chips"></div>
+    </div>
+  </div>
+
+  <!-- TAB: MODEL REGISTRY -->
+  <div id="tab-model" class="view-tabs">
+    <div class="section-header">
+      <div class="section-title">Model Registry</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="table-panel" style="margin-bottom:12px">
+      <table>
+        <thead>
+          <tr>
+            <th>Model ID</th><th>Type</th><th>Target</th><th>Horizon</th><th>MAPE</th><th>R²</th><th>Training Size</th><th>Last Updated</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="model-registry-body"></tbody>
+      </table>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div class="chart-panel">
+        <div class="panel-title" style="margin-bottom:12px">Model Comparison (MAPE)</div>
+        <canvas id="model-compare-chart" height="220"></canvas>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title" style="margin-bottom:12px">Training Performance Over Time</div>
+        <canvas id="train-hist-chart" height="220"></canvas>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title" style="margin-bottom:12px">Prediction Interval Width</div>
+        <canvas id="pi-chart" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ALERTS -->
+  <div id="tab-alerts" class="view-tabs">
+    <div class="section-header">
+      <div class="section-title">Anomaly Detection Log</div>
+      <div class="section-line"></div>
+      <div class="section-badge" id="alert-count">7 Active</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="chart-panel">
+        <div class="panel-title" style="margin-bottom:12px">Recent Anomalies</div>
+        <div id="anomaly-list"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-header"><div class="panel-title">Anomaly Score Over Time</div></div>
+        <canvas id="anomaly-ts-chart" height="280"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─── GLOBAL STATE ───────────────────────────────────────────────────────
+const charts = {};
+const sparkCharts = [];
+const history = { throughput: [], timestamp: [] };
+let windowMode = '1H';
+
+// ─── CLOCK ──────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ─── DATA SIMULATION ────────────────────────────────────────────────────
+const NODES = [
+  { id:'NYC-01', region:'US-East', base:180 },
+  { id:'LAX-02', region:'US-West', base:155 },
+  { id:'LON-03', region:'EU-West', base:140 },
+  { id:'FRA-04', region:'EU-Central', base:120 },
+  { id:'SIN-05', region:'APAC', base:110 },
+  { id:'TYO-06', region:'APAC-N', base:95 },
+  { id:'SYD-07', region:'APAC-S', base:75 },
+  { id:'SAO-08', region:'LATAM', base:65 },
+];
+
+function noise(scale=1) { return (Math.random() - 0.5) * scale; }
+function sinWave(t, period=24, amp=1) { return Math.sin(2*Math.PI*t/period)*amp; }
+
+function simulateTraffic(baseGbps) {
+  const h = new Date().getHours() + new Date().getMinutes()/60;
+  const daily = sinWave(h, 24, 0.3);
+  const weekly = sinWave(new Date().getDay(), 7, 0.1);
+  const spike = Math.random() < 0.02 ? Math.random()*0.4 : 0;
+  return baseGbps * (1 + daily + weekly + spike + noise(0.05));
+}
+
+function sarimax_forecast(actual, steps=24) {
+  // Simulate SARIMAX forecast with confidence intervals
+  const forecast = [], lower = [], upper = [];
+  let prev = actual;
+  for (let i = 0; i < steps; i++) {
+    const trend = 0.995;
+    const h = (new Date().getHours() + i) % 24;
+    const seasonal = sinWave(h, 24, 0.25);
+    const f = prev * trend * (1 + seasonal) + noise(8);
+    const uncertainty = 15 + i * 1.2;
+    forecast.push(f);
+    lower.push(f - uncertainty);
+    upper.push(f + uncertainty);
+    prev = f;
+  }
+  return { forecast, lower, upper };
+}
+
+// ─── INITIALIZE SPARKLINES ───────────────────────────────────────────────
+function initSparklines() {
+  const colors = ['#00d4ff','#00ff88','#ff6b35','#00d4ff','#a855f7','#ffb800','#ff3366','#00ff88'];
+  for (let i = 0; i < 8; i++) {
+    const ctx = document.getElementById(`sp-${i}`).getContext('2d');
+    sparkCharts.push(new Chart(ctx, {
+      type: 'line',
+      data: { labels: Array(20).fill(''), datasets: [{ data: Array.from({length:20},()=>Math.random()*100), borderColor: colors[i], borderWidth: 1.5, fill: false, tension: 0.4, pointRadius: 0 }] },
+      options: { animation:false, scales:{x:{display:false},y:{display:false}}, plugins:{legend:{display:false},tooltip:{enabled:false}}, responsive:true, maintainAspectRatio:false }
+    }));
+  }
+}
+
+function updateSparklines() {
+  sparkCharts.forEach((chart, i) => {
+    const d = chart.data.datasets[0].data;
+    d.shift(); d.push(40 + Math.random()*60);
+    chart.update('none');
+  });
+}
+
+// ─── MAIN TRAFFIC CHART ──────────────────────────────────────────────────
+const HISTORY_LEN = 60;
+const timeLabels = [];
+const actualData = [];
+const forecastData = [];
+const ciUpperData = [];
+const ciLowerData = [];
+
+// Prepopulate history
+for (let i = HISTORY_LEN-1; i >= 0; i--) {
+  const t = new Date(Date.now() - i*5000);
+  timeLabels.push(t.toLocaleTimeString('en-US',{hour12:false}));
+  const h = t.getHours() + t.getMinutes()/60;
+  const val = 847 + sinWave(h,24,120) + noise(30);
+  actualData.push(val);
+  forecastData.push(null);
+  ciUpperData.push(null);
+  ciLowerData.push(null);
+}
+// Last 12 as forecast
+for (let i = HISTORY_LEN-12; i < HISTORY_LEN; i++) {
+  forecastData[i] = actualData[i] + noise(15);
+  ciUpperData[i] = forecastData[i] + 25;
+  ciLowerData[i] = forecastData[i] - 25;
+}
+
+function initMainChart() {
+  const ctx = document.getElementById('main-chart').getContext('2d');
+  charts.main = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: timeLabels,
+      datasets: [
+        {
+          label: 'CI Upper',
+          data: ciUpperData,
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(0,212,255,0.06)',
+          fill: '+1',
+          pointRadius: 0,
+          tension: 0.4,
+        },
+        {
+          label: 'CI Lower',
+          data: ciLowerData,
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(0,212,255,0.06)',
+          fill: false,
+          pointRadius: 0,
+          tension: 0.4,
+        },
+        {
+          label: 'Actual',
+          data: actualData,
+          borderColor: '#00d4ff',
+          backgroundColor: 'rgba(0,212,255,0.08)',
+          fill: true,
+          pointRadius: 0,
+          borderWidth: 2,
+          tension: 0.4,
+        },
+        {
+          label: 'SARIMAX Forecast',
+          data: forecastData,
+          borderColor: '#00ff88',
+          borderDash: [5,3],
+          backgroundColor: 'transparent',
+          pointRadius: 0,
+          borderWidth: 2,
+          tension: 0.4,
+        }
+      ]
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          ticks: { color: '#4d6a94', maxTicksLimit: 8, font:{size:9,family:'Space Mono'} },
+          grid: { color: 'rgba(26,42,69,0.4)' }
+        },
+        y: {
+          ticks: { color: '#4d6a94', font:{size:9,family:'Space Mono'}, callback: v => v.toFixed(0)+' G' },
+          grid: { color: 'rgba(26,42,69,0.4)' }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: '#8ba3c7', font:{size:10,family:'Space Mono'}, boxWidth:20 } },
+        tooltip: { backgroundColor: '#0d1525', borderColor: '#1a2a45', borderWidth:1, titleColor:'#e2eaf8', bodyColor:'#8ba3c7' }
+      }
+    }
+  });
+}
+
+function updateMainChart(newVal) {
+  const label = new Date().toLocaleTimeString('en-US',{hour12:false});
+  charts.main.data.labels.push(label);
+  charts.main.data.datasets[2].data.push(newVal);
+
+  const fc = newVal + noise(10);
+  charts.main.data.datasets[3].data.push(fc);
+  charts.main.data.datasets[0].data.push(fc+30);
+  charts.main.data.datasets[1].data.push(fc-30);
+
+  if (charts.main.data.labels.length > 80) {
+    charts.main.data.labels.shift();
+    charts.main.data.datasets.forEach(ds => ds.data.shift());
+  }
+  charts.main.update('none');
+}
+
+// ─── PROTOCOL PIE ────────────────────────────────────────────────────────
+function initProtoChart() {
+  const ctx = document.getElementById('proto-chart').getContext('2d');
+  charts.proto = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['HTTP/3','TCP','UDP','QUIC','gRPC','MPLS','BGP','Other'],
+      datasets: [{ data:[34,22,18,12,7,4,2,1], backgroundColor:['#00d4ff','#00ff88','#ff6b35','#a855f7','#ffb800','#ff3366','#00acc1','#546e7a'], borderColor:'#080d18', borderWidth:2 }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      cutout:'65%',
+      plugins: { legend:{ position:'right', labels:{ color:'#8ba3c7', font:{size:10,family:'Space Mono'}, boxWidth:12, padding:8 } } }
+    }
+  });
+}
+
+// ─── HEATMAP (BAR) ───────────────────────────────────────────────────────
+function initHeatChart() {
+  const ctx = document.getElementById('heat-chart').getContext('2d');
+  charts.heat = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: NODES.map(n=>n.id),
+      datasets: [{
+        label:'Gbps',
+        data: NODES.map(n => simulateTraffic(n.base)),
+        backgroundColor: NODES.map((_,i) => `hsl(${190+i*12},80%,${35+i*4}%)`),
+        borderColor:'transparent', borderRadius:3
+      }]
+    },
+    options: {
+      animation:false, responsive:true, maintainAspectRatio:false,
+      indexAxis:'y',
+      scales:{
+        x:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.4)'}},
+        y:{ticks:{color:'#8ba3c7',font:{size:9,family:'Space Mono'}},grid:{color:'transparent'}}
+      },
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1525',borderColor:'#1a2a45',borderWidth:1}}
+    }
+  });
+}
+
+// ─── ANOMALY SCORE ───────────────────────────────────────────────────────
+function initAnomChart() {
+  const ctx = document.getElementById('anom-chart').getContext('2d');
+  const labels = Array.from({length:40},(_,i)=>`-${40-i}m`);
+  const scores = labels.map(()=>Math.abs(noise(2.5)));
+  scores[15]=3.8; scores[28]=4.2; scores[35]=2.9;
+  charts.anom = new Chart(ctx, {
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Z-Score',data:scores,borderColor:'#a855f7',backgroundColor:'rgba(168,85,247,0.1)',fill:true,pointRadius:scores.map(v=>v>2.5?5:0),pointBackgroundColor:'#ff3366',tension:0.4,borderWidth:1.5},
+      {label:'Threshold',data:labels.map(()=>2.5),borderColor:'#ff3366',borderDash:[4,3],borderWidth:1,pointRadius:0,fill:false}
+    ]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:9},maxTicksLimit:8},grid:{color:'rgba(26,42,69,0.3)'}},y:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}}},plugins:{legend:{labels:{color:'#8ba3c7',font:{size:9},boxWidth:12}},tooltip:{backgroundColor:'#0d1525',borderColor:'#1a2a45',borderWidth:1}}}
+  });
+}
+
+// ─── ACCURACY BAR ────────────────────────────────────────────────────────
+function initAccChart() {
+  const ctx = document.getElementById('acc-chart').getContext('2d');
+  charts.acc = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels:['1H','3H','6H','12H','24H','48H','72H'],
+      datasets:[{label:'MAPE %',data:[1.2,2.1,3.0,3.8,4.6,6.1,8.4],backgroundColor:['#00ff88','#00ff88','#00d4ff','#00d4ff','#ffb800','#ff6b35','#ff3366'],borderRadius:3,borderColor:'transparent'}]
+    },
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}},y:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}}},plugins:{legend:{display:false}}}
+  });
+}
+
+// ─── FORECAST HORIZON CHART ───────────────────────────────────────────────
+function initHorizonChart() {
+  const ctx = document.getElementById('horizon-chart').getContext('2d');
+  const labels = Array.from({length:24},(_,i)=>{const d=new Date();d.setHours(d.getHours()+i);return d.getHours()+':00';});
+  const base = 847;
+  const {forecast, lower, upper} = sarimax_forecast(base, 24);
+  charts.horizon = new Chart(ctx, {
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Upper CI',data:upper,borderColor:'transparent',backgroundColor:'rgba(0,255,136,0.08)',fill:'+1',pointRadius:0,tension:0.4},
+      {label:'Lower CI',data:lower,borderColor:'transparent',backgroundColor:'transparent',fill:false,pointRadius:0,tension:0.4},
+      {label:'Forecast',data:forecast,borderColor:'#00ff88',backgroundColor:'rgba(0,255,136,0.05)',fill:true,pointRadius:2,borderWidth:2,tension:0.4}
+    ]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:9},maxTicksLimit:12},grid:{color:'rgba(26,42,69,0.4)'}},y:{ticks:{color:'#4d6a94',font:{size:9},callback:v=>v.toFixed(0)+'G'},grid:{color:'rgba(26,42,69,0.4)'}}},plugins:{legend:{labels:{color:'#8ba3c7',font:{size:9},boxWidth:12}},tooltip:{backgroundColor:'#0d1525',borderColor:'#1a2a45',borderWidth:1}}}
+  });
+}
+
+// ─── RESIDUALS ───────────────────────────────────────────────────────────
+function initResidChart() {
+  const ctx = document.getElementById('resid-chart').getContext('2d');
+  const bins = Array.from({length:20},(_,i)=>-20+i*2);
+  const counts = bins.map(b=>Math.round(80*Math.exp(-0.5*((b)/7)**2)+noise(5)));
+  charts.resid = new Chart(ctx, {
+    type:'bar',
+    data:{labels:bins.map(b=>b.toFixed(0)),datasets:[{label:'Frequency',data:counts,backgroundColor:'rgba(0,212,255,0.5)',borderColor:'#00d4ff',borderWidth:1,borderRadius:1}]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:8},maxTicksLimit:10},grid:{color:'rgba(26,42,69,0.3)'}},y:{ticks:{color:'#4d6a94',font:{size:8}},grid:{color:'rgba(26,42,69,0.3)'}}},plugins:{legend:{display:false}}}
+  });
+}
+
+// ─── ACF CHART ───────────────────────────────────────────────────────────
+function initACFChart() {
+  const ctx = document.getElementById('acf-chart').getContext('2d');
+  const lags = Array.from({length:25},(_,i)=>i);
+  const acf = lags.map(l => l===0?1:Math.exp(-l*0.1)*Math.cos(l*0.5)+noise(0.08));
+  charts.acf = new Chart(ctx, {
+    type:'bar',
+    data:{labels:lags,datasets:[
+      {label:'ACF',data:acf,backgroundColor:acf.map(v=>v>0?'rgba(0,212,255,0.6)':'rgba(255,107,53,0.6)'),borderColor:acf.map(v=>v>0?'#00d4ff':'#ff6b35'),borderWidth:1},
+      {label:'95% CI',data:lags.map(()=>0.196),borderColor:'rgba(255,51,102,0.5)',borderDash:[3,2],type:'line',pointRadius:0,fill:false},
+      {label:'-95% CI',data:lags.map(()=>-0.196),borderColor:'rgba(255,51,102,0.5)',borderDash:[3,2],type:'line',pointRadius:0,fill:false}
+    ]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:8}},grid:{color:'rgba(26,42,69,0.3)'}},y:{min:-0.8,max:1.1,ticks:{color:'#4d6a94',font:{size:8}},grid:{color:'rgba(26,42,69,0.3)'}}},plugins:{legend:{labels:{color:'#8ba3c7',font:{size:9},boxWidth:10}}}}
+  });
+}
+
+// ─── FEATURE CATEGORY PIE ─────────────────────────────────────────────────
+function initFeatureCatChart() {
+  const ctx = document.getElementById('feature-cat-chart').getContext('2d');
+  charts.featureCat = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels:['Temporal','Statistical','Network','Lag/Roll','Exogenous','Spectral'],
+      datasets:[{data:[9,8,8,7,6,4],backgroundColor:['#00d4ff','#00ff88','#ff6b35','#a855f7','#ffb800','#ff3366'],borderColor:'#080d18',borderWidth:2}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'bottom',labels:{color:'#8ba3c7',font:{size:9,family:'Space Mono'},boxWidth:10,padding:6}}}}
+  });
+}
+
+// ─── MODEL COMPARE ───────────────────────────────────────────────────────
+function initModelCompareChart() {
+  if (!document.getElementById('model-compare-chart')) return;
+  const ctx = document.getElementById('model-compare-chart').getContext('2d');
+  charts.modelCompare = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels:['SARIMAX\n(2,1,2)', 'ARIMA', 'Prophet', 'LSTM', 'XGBoost', 'Naive'],
+      datasets:[{label:'MAPE %',data:[3.81,5.92,4.47,4.12,3.95,9.84],backgroundColor:['#00ff88','#546e7a','#546e7a','#00d4ff','#a855f7','#ff3366'],borderRadius:3,borderColor:'transparent'}]
+    },
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}},y:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}}},plugins:{legend:{display:false}}}
+  });
+}
+
+function initTrainHistChart() {
+  if (!document.getElementById('train-hist-chart')) return;
+  const ctx = document.getElementById('train-hist-chart').getContext('2d');
+  const labels = ['7d','6d','5d','4d','3d','2d','1d','Now'];
+  charts.trainHist = new Chart(ctx, {
+    type:'line',
+    data:{labels,datasets:[{label:'Val MAPE',data:[5.1,4.8,4.5,4.3,4.1,4.0,3.9,3.81],borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.08)',fill:true,pointRadius:3,tension:0.4,borderWidth:2}]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}},y:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}}},plugins:{legend:{display:false}}}
+  });
+}
+
+function initPIChart() {
+  if (!document.getElementById('pi-chart')) return;
+  const ctx = document.getElementById('pi-chart').getContext('2d');
+  const labels = ['1H','3H','6H','12H','24H'];
+  charts.pi = new Chart(ctx, {
+    type:'bar',
+    data:{labels,datasets:[{label:'Avg PI Width (Gbps)',data:[18,26,35,48,62],backgroundColor:'rgba(168,85,247,0.5)',borderColor:'#a855f7',borderWidth:1,borderRadius:3}]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}},y:{ticks:{color:'#4d6a94',font:{size:9}},grid:{color:'rgba(26,42,69,0.3)'}}},plugins:{legend:{display:false}}}
+  });
+}
+
+function initAnomalyTSChart() {
+  if (!document.getElementById('anomaly-ts-chart')) return;
+  const ctx = document.getElementById('anomaly-ts-chart').getContext('2d');
+  const labels = Array.from({length:48},(_,i)=>`-${48-i}h`);
+  const scores = labels.map(()=>0.5+Math.abs(noise(2)));
+  [5,14,22,35,40,44,46].forEach(i=>{ scores[i]=2.5+Math.random()*2.5; });
+  charts.anomalyTS = new Chart(ctx, {
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Anomaly Score',data:scores,borderColor:'#a855f7',backgroundColor:'rgba(168,85,247,0.1)',fill:true,pointRadius:scores.map(v=>v>2.5?5:0),pointBackgroundColor:'#ff3366',tension:0.3,borderWidth:1.5},
+      {label:'Threshold (2.5σ)',data:labels.map(()=>2.5),borderColor:'rgba(255,51,102,0.6)',borderDash:[4,3],borderWidth:1,pointRadius:0,fill:false}
+    ]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{color:'#4d6a94',font:{size:8},maxTicksLimit:12},grid:{color:'rgba(26,42,69,0.3)'}},y:{ticks:{color:'#4d6a94',font:{size:8}},grid:{color:'rgba(26,42,69,0.3)'}}},plugins:{legend:{labels:{color:'#8ba3c7',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#0d1525',borderColor:'#1a2a45',borderWidth:1}}}
+  });
+}
+
+// ─── NODE TABLE ───────────────────────────────────────────────────────────
+function updateNodeTable() {
+  const tbody = document.getElementById('node-table-body');
+  const ts = document.getElementById('node-update-ts');
+  if (!tbody) return;
+  ts.textContent = 'Updated ' + new Date().toLocaleTimeString('en-US',{hour12:false});
+  tbody.innerHTML = NODES.map(n => {
+    const gbps = simulateTraffic(n.base);
+    const util = Math.min(99.5, gbps / (n.base*1.3)*100);
+    const latency = 8 + Math.random()*20;
+    const loss = Math.random() * 0.05;
+    const fcErr = (Math.random()*6-1).toFixed(1);
+    const status = util > 85 ? 'warn' : loss > 0.03 ? 'alert' : 'ok';
+    const statusLabel = { ok:'NOMINAL', warn:'HIGH UTIL', alert:'PACKET LOSS' }[status];
+    return `<tr>
+      <td style="color:var(--accent);font-family:var(--mono)">${n.id}</td>
+      <td>${n.region}</td>
+      <td style="color:var(--text)">${gbps.toFixed(1)} Gbps</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${util.toFixed(0)}%;background:${util>85?'var(--warn)':'var(--accent)'};border-radius:2px"></div>
+          </div>
+          <span style="color:var(--text2);font-size:10px;width:32px">${util.toFixed(0)}%</span>
+        </div>
+      </td>
+      <td>${latency.toFixed(1)} ms</td>
+      <td style="color:${loss>0.03?'var(--danger)':'var(--text2)'}">${(loss*100).toFixed(3)}%</td>
+      <td style="color:${parseFloat(fcErr)>0?'var(--accent3)':'var(--danger)'}">${fcErr > 0 ? '+':''}${fcErr}%</td>
+      <td><span class="status-badge ${status}">${statusLabel}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── FEATURES ─────────────────────────────────────────────────────────────
+const FEATURES = [
+  // Temporal (9)
+  {name:'hour_of_day', cat:'temporal', color:'#00d4ff', imp:0.18},
+  {name:'day_of_week', cat:'temporal', color:'#00d4ff', imp:0.15},
+  {name:'is_weekend', cat:'temporal', color:'#00d4ff', imp:0.09},
+  {name:'is_peak_hour', cat:'temporal', color:'#00d4ff', imp:0.12},
+  {name:'month', cat:'temporal', color:'#00d4ff', imp:0.07},
+  {name:'quarter', cat:'temporal', color:'#00d4ff', imp:0.06},
+  {name:'week_of_year', cat:'temporal', color:'#00d4ff', imp:0.05},
+  {name:'is_holiday', cat:'temporal', color:'#00d4ff', imp:0.08},
+  {name:'hour_sin_cos', cat:'temporal', color:'#00d4ff', imp:0.11},
+  // Statistical (8)
+  {name:'rolling_mean_1h', cat:'statistical', color:'#00ff88', imp:0.22},
+  {name:'rolling_std_1h', cat:'statistical', color:'#00ff88', imp:0.14},
+  {name:'rolling_mean_6h', cat:'statistical', color:'#00ff88', imp:0.17},
+  {name:'rolling_max_24h', cat:'statistical', color:'#00ff88', imp:0.13},
+  {name:'rolling_min_24h', cat:'statistical', color:'#00ff88', imp:0.10},
+  {name:'ewm_alpha_0.3', cat:'statistical', color:'#00ff88', imp:0.16},
+  {name:'kurtosis_1h', cat:'statistical', color:'#00ff88', imp:0.06},
+  {name:'skewness_1h', cat:'statistical', color:'#00ff88', imp:0.05},
+  // Network (8)
+  {name:'utilization_pct', cat:'network', color:'#ff6b35', imp:0.25},
+  {name:'packet_loss_rate', cat:'network', color:'#ff6b35', imp:0.19},
+  {name:'avg_latency_ms', cat:'network', color:'#ff6b35', imp:0.21},
+  {name:'jitter_ms', cat:'network', color:'#ff6b35', imp:0.14},
+  {name:'active_flows', cat:'network', color:'#ff6b35', imp:0.23},
+  {name:'bytes_in_out_ratio', cat:'network', color:'#ff6b35', imp:0.12},
+  {name:'top_talker_share', cat:'network', color:'#ff6b35', imp:0.09},
+  {name:'protocol_entropy', cat:'network', color:'#ff6b35', imp:0.11},
+  // Lag / Rolling (7)
+  {name:'lag_1', cat:'lag', color:'#a855f7', imp:0.31},
+  {name:'lag_24', cat:'lag', color:'#a855f7', imp:0.28},
+  {name:'lag_168', cat:'lag', color:'#a855f7', imp:0.24},
+  {name:'lag_2', cat:'lag', color:'#a855f7', imp:0.20},
+  {name:'lag_48', cat:'lag', color:'#a855f7', imp:0.18},
+  {name:'diff_lag1', cat:'lag', color:'#a855f7', imp:0.15},
+  {name:'diff_lag24', cat:'lag', color:'#a855f7', imp:0.13},
+  // Exogenous (6)
+  {name:'cdn_requests_norm', cat:'exogenous', color:'#ffb800', imp:0.16},
+  {name:'dns_query_rate', cat:'exogenous', color:'#ffb800', imp:0.13},
+  {name:'bgp_route_changes', cat:'exogenous', color:'#ffb800', imp:0.10},
+  {name:'ntp_sync_drift', cat:'exogenous', color:'#ffb800', imp:0.07},
+  {name:'geo_event_flag', cat:'exogenous', color:'#ffb800', imp:0.09},
+  {name:'maintenance_window', cat:'exogenous', color:'#ffb800', imp:0.12},
+  // Spectral (4)
+  {name:'fft_peak_24h', cat:'spectral', color:'#ff3366', imp:0.20},
+  {name:'fft_peak_168h', cat:'spectral', color:'#ff3366', imp:0.17},
+  {name:'spectral_entropy', cat:'spectral', color:'#ff3366', imp:0.11},
+  {name:'periodogram_power', cat:'spectral', color:'#ff3366', imp:0.09},
+];
+
+function renderFeatureChips() {
+  const container = document.getElementById('feature-chips');
+  if (!container) return;
+  container.innerHTML = FEATURES.map(f=>`
+    <div class="feature-chip">
+      <div class="dot" style="background:${f.color}"></div>
+      <span>${f.name}</span>
+      <span class="importance">${(f.imp*100).toFixed(0)}%</span>
+    </div>
+  `).join('');
+}
+
+function renderFeatureImportanceBars() {
+  const container = document.getElementById('feature-importance-bars');
+  if (!container) return;
+  const top15 = [...FEATURES].sort((a,b)=>b.imp-a.imp).slice(0,15);
+  container.innerHTML = top15.map(f=>`
+    <div class="spark-bar-row">
+      <div class="spark-bar-label">${f.name}</div>
+      <div class="spark-bar-track">
+        <div class="spark-bar-fill" style="width:${f.imp/0.31*100}%;background:${f.color}"></div>
+      </div>
+      <div class="spark-bar-val">${(f.imp*100).toFixed(0)}%</div>
+    </div>
+  `).join('');
+}
+
+// ─── MODEL REGISTRY TABLE ─────────────────────────────────────────────────
+const MODEL_REGISTRY = [
+  {id:'sarimax-v2.4',type:'SARIMAX',target:'Throughput',horizon:'24H',mape:'3.81%',r2:'0.974',size:'48K rows',updated:'2h ago',status:'ok'},
+  {id:'sarimax-v2.4',type:'SARIMAX',target:'Latency',horizon:'6H',mape:'4.12%',r2:'0.961',size:'48K rows',updated:'2h ago',status:'ok'},
+  {id:'sarimax-v2.3',type:'SARIMAX',target:'Packet Loss',horizon:'12H',mape:'5.30%',r2:'0.942',size:'48K rows',updated:'2h ago',status:'ok'},
+  {id:'arima-v1.9',type:'ARIMA',target:'Throughput',horizon:'24H',mape:'5.92%',r2:'0.921',size:'48K rows',updated:'8h ago',status:'warn'},
+  {id:'prophet-v1.2',type:'Prophet',target:'Throughput',horizon:'7D',mape:'4.47%',r2:'0.938',size:'48K rows',updated:'1d ago',status:'ok'},
+  {id:'lstm-v3.1',type:'LSTM',target:'Multi-KPI',horizon:'6H',mape:'4.12%',r2:'0.957',size:'48K rows',updated:'6h ago',status:'ok'},
+];
+
+function renderModelRegistry() {
+  const tbody = document.getElementById('model-registry-body');
+  if (!tbody) return;
+  tbody.innerHTML = MODEL_REGISTRY.map(m=>`<tr>
+    <td style="color:var(--accent);font-family:var(--mono)">${m.id}</td>
+    <td>${m.type}</td>
+    <td>${m.target}</td>
+    <td>${m.horizon}</td>
+    <td style="color:${parseFloat(m.mape)<4.5?'var(--accent3)':'var(--warn)'}">${m.mape}</td>
+    <td style="color:var(--text2)">${m.r2}</td>
+    <td style="color:var(--text3)">${m.size}</td>
+    <td style="color:var(--text3)">${m.updated}</td>
+    <td><span class="status-badge ${m.status}">${m.status==='ok'?'ACTIVE':'DEGRADED'}</span></td>
+  </tr>`).join('');
+}
+
+// ─── ANOMALY LOG ──────────────────────────────────────────────────────────
+const ANOMALIES = [
+  {sev:'high', icon:'⚠', node:'NYC-01', msg:'Traffic spike: +342% above forecast band', time:'3 min ago', score:'4.2σ'},
+  {sev:'high', icon:'⚠', node:'LAX-02', msg:'Packet loss rate exceeded 0.1% threshold', time:'12 min ago', score:'3.8σ'},
+  {sev:'med', icon:'◆', node:'FRA-04', msg:'Latency P99 elevated: 87ms vs 22ms baseline', time:'28 min ago', score:'3.1σ'},
+  {sev:'med', icon:'◆', node:'SIN-05', msg:'Unusual BGP route flap detected — 14 updates', time:'41 min ago', score:'2.9σ'},
+  {sev:'low', icon:'●', node:'TYO-06', msg:'Forecast residual drift: model refit suggested', time:'1h 02m ago', score:'2.7σ'},
+  {sev:'low', icon:'●', node:'SYD-07', msg:'DNS query rate 20% below seasonal expectation', time:'1h 34m ago', score:'2.6σ'},
+  {sev:'low', icon:'●', node:'SAO-08', msg:'NTP drift anomaly — clock sync degraded', time:'2h 11m ago', score:'2.5σ'},
+];
+
+function renderAnomalyList() {
+  const container = document.getElementById('anomaly-list');
+  if (!container) return;
+  container.innerHTML = ANOMALIES.map(a=>`
+    <div class="anomaly-item">
+      <div class="anomaly-icon ${a.sev}">${a.icon}</div>
+      <div class="anomaly-body">
+        <div class="anomaly-title"><span style="color:var(--accent)">${a.node}</span> — ${a.msg}</div>
+        <div class="anomaly-meta">${a.time} · Z-Score: <span style="color:${a.sev==='high'?'var(--danger)':a.sev==='med'?'var(--warn)':'var(--text2)'}">${a.score}</span></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── TICKER ───────────────────────────────────────────────────────────────
+function initTicker() {
+  const container = document.getElementById('ticker-items');
+  if (!container) return;
+  // Duplicate for seamless loop
+  const items = [...NODES, ...NODES].map(n=>{
+    const val = simulateTraffic(n.base);
+    const chg = noise(5).toFixed(1);
+    return `<div class="ticker-item"><span class="node">${n.id}</span><span class="val">${val.toFixed(1)}G</span><span class="chg ${parseFloat(chg)>=0?'up':'down'}">${parseFloat(chg)>=0?'+':''}${chg}%</span></div>`;
+  }).join('');
+  container.innerHTML = items;
+}
+
+// ─── KPI UPDATES ─────────────────────────────────────────────────────────
+let totalTraffic = 847.3;
+function updateKPIs() {
+  totalTraffic += noise(15);
+  totalTraffic = Math.max(600, Math.min(1100, totalTraffic));
+
+  const avail = 99.97 + noise(0.02);
+  const loss = 0.018 + Math.random()*0.01;
+  const latency = 14.2 + noise(3);
+  const flows = 2.34 + noise(0.2);
+  const mape = 3.81 + noise(0.3);
+  const anoms = Math.round(7 + noise(2));
+  const acc = 96.2 + noise(0.5);
+
+  const set = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = val; el.classList.add('updated'); setTimeout(()=>el.classList.remove('updated'),1000); }
+  };
+
+  set('v-throughput', totalTraffic.toFixed(1));
+  set('v-avail', Math.min(99.99, avail).toFixed(2));
+  set('v-loss', (loss*100).toFixed(3));
+  set('v-latency', latency.toFixed(1));
+  set('v-flows', flows.toFixed(2));
+  set('v-mape', mape.toFixed(2));
+  set('v-anom', Math.max(0,anoms));
+  set('v-acc', acc.toFixed(1));
+
+  updateMainChart(totalTraffic);
+  updateSparklines();
+  updateNodeTable();
+  updateHeatChart();
+  initTicker();
+
+  // Update stakeholder count
+  const sc = document.getElementById('stakeholder-count');
+  if (sc) sc.textContent = `${200 + Math.round(Math.random()*30)} stakeholders active`;
+}
+
+function updateHeatChart() {
+  if (!charts.heat) return;
+  charts.heat.data.datasets[0].data = NODES.map(n=>simulateTraffic(n.base));
+  charts.heat.update('none');
+}
+
+// ─── TAB NAVIGATION ────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.view-tabs').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  event.target.classList.add('active');
+
+  // Lazy init charts for tab
+  if (name==='forecast') {
+    if (!charts.horizon) initHorizonChart();
+    if (!charts.resid) initResidChart();
+    if (!charts.acf) initACFChart();
+  }
+  if (name==='pipeline') {
+    if (!charts.featureCat) initFeatureCatChart();
+    renderFeatureImportanceBars();
+    renderFeatureChips();
+  }
+  if (name==='model') {
+    renderModelRegistry();
+    if (!charts.modelCompare) initModelCompareChart();
+    if (!charts.trainHist) initTrainHistChart();
+    if (!charts.pi) initPIChart();
+  }
+  if (name==='alerts') {
+    renderAnomalyList();
+    if (!charts.anomalyTS) initAnomalyTSChart();
+  }
+}
+
+function setWindow(btn, mode) {
+  document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  windowMode = mode;
+}
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────
+initSparklines();
+initMainChart();
+initProtoChart();
+initHeatChart();
+initAnomChart();
+initAccChart();
+initTicker();
+updateNodeTable();
+
+// Start live updates
+setInterval(updateKPIs, 5000);
+
+// Initial KPI update
+setTimeout(updateKPIs, 500);
+</script>
+</body>
+</html>

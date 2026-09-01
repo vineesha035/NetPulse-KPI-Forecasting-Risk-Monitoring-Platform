@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetPulse — Network Traffic Forecasting Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #070B14;
+  --bg2: #0D1320;
+  --bg3: #121929;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #E8EDF8;
+  --text2: #8B96AD;
+  --text3: #4E5A6E;
+  --accent: #3B82F6;
+  --accent2: #6366F1;
+  --green: #10B981;
+  --yellow: #F59E0B;
+  --red: #EF4444;
+  --purple: #8B5CF6;
+  --teal: #06B6D4;
+  --font-main: 'DM Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 14px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ─── Grid noise overlay ─── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+/* ─── Top Navigation ─── */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(7,11,20,0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+}
+.logo-mark {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+  letter-spacing: -0.5px;
+}
+.logo-text { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+.logo-text span { color: var(--text2); font-weight: 400; }
+
+.nav-center {
+  display: flex; gap: 4px;
+}
+.nav-btn {
+  padding: 5px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+  background: transparent; border: none; color: var(--text2); cursor: pointer;
+  transition: all 0.15s;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.nav-btn.active { background: rgba(59,130,246,0.15); color: var(--accent); }
+
+.nav-right { display: flex; align-items: center; gap: 12px; }
+.badge-live {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 500; color: var(--green);
+  background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25);
+  padding: 4px 10px; border-radius: 20px; font-family: var(--font-mono);
+}
+.pulse-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+
+.timestamp { font-size: 11px; font-family: var(--font-mono); color: var(--text3); }
+
+/* ─── Main Layout ─── */
+.main { position: relative; z-index: 1; padding: 20px 24px; }
+
+/* ─── Site Selector Tabs ─── */
+.site-tabs {
+  display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.site-tab {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg2); cursor: pointer;
+  font-size: 12px; font-weight: 500; color: var(--text2);
+  transition: all 0.15s;
+}
+.site-tab:hover { border-color: var(--border2); color: var(--text); }
+.site-tab.active {
+  border-color: var(--accent);
+  background: rgba(59,130,246,0.08);
+  color: var(--accent);
+}
+.site-util-badge {
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-family: var(--font-mono);
+}
+
+/* ─── KPI Cards Grid ─── */
+.kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.kpi-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.kpi-card:hover { border-color: var(--border2); }
+.kpi-card::after {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: var(--card-accent, var(--accent));
+}
+.kpi-label { font-size: 11px; font-weight: 500; color: var(--text3); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; }
+.kpi-value { font-size: 26px; font-weight: 600; letter-spacing: -1px; line-height: 1; margin-bottom: 6px; }
+.kpi-sub { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 4px; }
+.kpi-delta { font-size: 11px; font-weight: 600; }
+.kpi-delta.up { color: var(--red); }
+.kpi-delta.down { color: var(--green); }
+.kpi-delta.neutral { color: var(--text2); }
+.kpi-sparkline { margin-top: 10px; height: 32px; }
+
+/* ─── Main Content Grid ─── */
+.content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+.content-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+/* ─── Panel ─── */
+.panel {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px;
+}
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+.panel-title { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
+.panel-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.panel-controls { display: flex; gap: 6px; }
+.pill-btn {
+  padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 500;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text2); cursor: pointer; transition: all 0.12s;
+}
+.pill-btn:hover { color: var(--text); border-color: var(--border2); }
+.pill-btn.active { background: rgba(59,130,246,0.15); border-color: var(--accent); color: var(--accent); }
+
+/* ─── Chart containers ─── */
+.chart-wrap { position: relative; }
+
+/* ─── Forecast ribbon ─── */
+.forecast-label {
+  position: absolute; top: 6px; right: 8px;
+  font-size: 9px; font-family: var(--font-mono); color: var(--text3);
+  letter-spacing: 0.5px;
+}
+
+/* ─── Traffic mix ─── */
+.traffic-mix { display: flex; flex-direction: column; gap: 8px; }
+.mix-row { display: flex; align-items: center; gap: 10px; }
+.mix-label { font-size: 12px; color: var(--text2); width: 48px; flex-shrink: 0; }
+.mix-bar-wrap { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.mix-bar { height: 100%; border-radius: 3px; transition: width 0.5s; }
+.mix-pct { font-size: 11px; font-family: var(--font-mono); color: var(--text2); width: 38px; text-align: right; }
+
+/* ─── Site table ─── */
+.sites-table { width: 100%; border-collapse: collapse; }
+.sites-table th {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--text3); padding: 0 0 10px; text-align: left;
+}
+.sites-table td { padding: 8px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.sites-table td:not(:first-child) { text-align: right; font-family: var(--font-mono); }
+
+/* ─── Utilization bar ─── */
+.util-bar-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.util-bar { width: 60px; height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.util-fill { height: 100%; border-radius: 2px; }
+
+/* ─── Status badge ─── */
+.status-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 600; font-family: var(--font-mono); letter-spacing: 0.3px;
+}
+.status-LOW { background: rgba(16,185,129,0.12); color: #10B981; }
+.status-MEDIUM { background: rgba(245,158,11,0.12); color: #F59E0B; }
+.status-HIGH { background: rgba(239,68,68,0.12); color: #EF4444; }
+
+/* ─── Model diagnostics ─── */
+.model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.model-card {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px;
+}
+.model-site { font-size: 11px; font-weight: 600; color: var(--accent); margin-bottom: 6px; }
+.model-stat { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+.model-stat-label { color: var(--text2); }
+.model-stat-val { font-family: var(--font-mono); font-size: 10px; color: var(--text); }
+
+/* ─── Anomaly feed ─── */
+.anomaly-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+.anomaly-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px; background: var(--bg3); border-radius: 8px;
+  border-left: 3px solid var(--red);
+}
+.anomaly-item.maintenance { border-left-color: var(--yellow); }
+.anomaly-icon { font-size: 14px; margin-top: 1px; }
+.anomaly-body { flex: 1; }
+.anomaly-title { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+.anomaly-detail { font-size: 10px; color: var(--text2); font-family: var(--font-mono); }
+
+/* ─── Feature engineering panel ─── */
+.feature-groups { display: flex; flex-direction: column; gap: 8px; }
+.feature-group {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; background: var(--bg3); border-radius: 7px;
+  border: 1px solid var(--border);
+}
+.fg-label { font-size: 12px; font-weight: 500; }
+.fg-count { font-size: 11px; font-family: var(--font-mono); color: var(--accent); }
+.fg-bar-wrap { width: 80px; height: 3px; background: var(--bg); border-radius: 2px; margin-left: 12px; }
+.fg-bar { height: 100%; border-radius: 2px; background: var(--accent); }
+
+/* ─── Forecast horizon selector ─── */
+.horizon-tabs { display: flex; gap: 4px; }
+.h-tab {
+  padding: 3px 10px; border-radius: 5px; font-size: 11px; font-family: var(--font-mono);
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+  cursor: pointer; transition: all 0.12s;
+}
+.h-tab:hover { border-color: var(--border2); color: var(--text); }
+.h-tab.active { background: rgba(99,102,241,0.15); border-color: var(--accent2); color: var(--accent2); }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ─── Fade-in animations ─── */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.panel, .kpi-card { animation: fadeUp 0.4s ease both; }
+.kpi-card:nth-child(1) { animation-delay: 0.05s; }
+.kpi-card:nth-child(2) { animation-delay: 0.1s; }
+.kpi-card:nth-child(3) { animation-delay: 0.15s; }
+.kpi-card:nth-child(4) { animation-delay: 0.2s; }
+.kpi-card:nth-child(5) { animation-delay: 0.25s; }
+.kpi-card:nth-child(6) { animation-delay: 0.3s; }
+
+/* ─── World map placeholder ─── */
+.world-map-svg { width: 100%; }
+.site-dot { cursor: pointer; transition: r 0.2s; }
+.site-dot:hover circle:first-child { r: 10; }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topbar">
+  <div class="logo">
+    <div class="logo-mark">NP</div>
+    <div class="logo-text">NetPulse <span>/ KPI Platform</span></div>
+  </div>
+  <div class="nav-center">
+    <button class="nav-btn active" onclick="switchView('dashboard', this)">Overview</button>
+    <button class="nav-btn" onclick="switchView('forecast', this)">Forecasts</button>
+    <button class="nav-btn" onclick="switchView('models', this)">Models</button>
+    <button class="nav-btn" onclick="switchView('anomalies', this)">Anomalies</button>
+    <button class="nav-btn" onclick="switchView('features', this)">Features</button>
+  </div>
+  <div class="nav-right">
+    <span class="timestamp" id="clock">—</span>
+    <div class="badge-live"><div class="pulse-dot"></div>LIVE · 5 sites</div>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <!-- ── Site Tabs ── -->
+  <div class="site-tabs" id="site-tabs"></div>
+
+  <!-- ── KPI Cards ── -->
+  <div class="kpi-grid" id="kpi-grid"></div>
+
+  <!-- ── DASHBOARD VIEW ── -->
+  <div id="view-dashboard">
+    <div class="content-grid">
+      <!-- Traffic + Forecast Chart -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Traffic & Forecast</div>
+            <div class="panel-sub">Actuals (solid) + SARIMAX forecast (dashed) with 95% CI</div>
+          </div>
+          <div class="panel-controls">
+            <div class="horizon-tabs">
+              <button class="h-tab active" onclick="setHorizon(24,this)">24h</button>
+              <button class="h-tab" onclick="setHorizon(48,this)">48h</button>
+              <button class="h-tab" onclick="setHorizon(168,this)">7d</button>
+            </div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <div class="forecast-label">◀ ACTUALS  FORECAST ▶</div>
+          <div style="height:260px;position:relative"><canvas id="trafficChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Traffic Mix -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Traffic Composition</div>
+            <div class="panel-sub">Current hour breakdown</div>
+          </div>
+        </div>
+        <div class="traffic-mix" id="traffic-mix"></div>
+        <div style="height:160px;position:relative;margin-top:16px"><canvas id="trafficDonut"></canvas></div>
+      </div>
+    </div>
+
+    <!-- 3-column bottom row -->
+    <div class="content-grid-3">
+      <!-- All Sites Table -->
+      <div class="panel" style="grid-column: span 2;">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">All Sites — Current Status</div>
+            <div class="panel-sub">Updated every 60 seconds</div>
+          </div>
+        </div>
+        <table class="sites-table">
+          <thead>
+            <tr>
+              <th>Site</th>
+              <th>Traffic</th>
+              <th>Utilization</th>
+              <th>Latency</th>
+              <th>Pkt Loss</th>
+              <th>Sessions</th>
+              <th>Risk</th>
+            </tr>
+          </thead>
+          <tbody id="sites-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Anomaly Feed -->
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Anomaly Feed</div>
+            <div class="panel-sub">Last 24h events</div>
+          </div>
+          <span id="anomaly-count" class="status-badge status-HIGH">0</span>
+        </div>
+        <div class="anomaly-list" id="anomaly-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FORECAST VIEW ── -->
+  <div id="view-forecast" style="display:none">
+    <div class="content-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">7-Day Multi-Site Forecast</div>
+            <div class="panel-sub">SARIMAX with exogenous features — 95% confidence bands</div>
+          </div>
+        </div>
+        <div style="height:300px;position:relative"><canvas id="multiSiteChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Peak Hour Forecast</div>
+            <div class="panel-sub">Next 24h hourly predictions</div>
+          </div>
+        </div>
+        <div style="height:300px;position:relative"><canvas id="peakHourChart"></canvas></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-header">
+        <div class="panel-title">Forecast Accuracy — Rolling 30-Day</div>
+        <div class="panel-sub">MAPE by site and horizon</div>
+      </div>
+      <div style="height:200px;position:relative"><canvas id="accuracyChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── MODELS VIEW ── -->
+  <div id="view-models" style="display:none">
+    <div class="content-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">SARIMAX Model Fleet</div>
+          <div class="panel-sub">One model per site · (p,d,q)(P,D,Q)24 orders · Auto-selected via AIC</div>
+        </div>
+        <div class="model-grid" id="model-grid"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Model Performance</div>
+          <div class="panel-sub">RMSE vs MAPE scatter</div>
+        </div>
+        <div style="height:300px;position:relative"><canvas id="modelScatterChart"></canvas></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-header">
+        <div class="panel-title">Residual Analysis — NYC-DC1</div>
+        <div class="panel-sub">Forecast errors over last 168 hours (should be white-noise)</div>
+      </div>
+      <div style="height:160px;position:relative"><canvas id="residualChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── ANOMALIES VIEW ── -->
+  <div id="view-anomalies" style="display:none">
+    <div class="content-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Anomaly Detection — All Sites</div>
+          <div class="panel-sub">Z-score + IQR ensemble · 24h rolling window</div>
+        </div>
+        <div style="height:280px;position:relative"><canvas id="anomalyTimelineChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Anomaly Type Distribution</div>
+          <div class="panel-sub">Last 30 days</div>
+        </div>
+        <div style="height:280px;position:relative"><canvas id="anomalyTypeChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FEATURES VIEW ── -->
+  <div id="view-features" style="display:none">
+    <div class="content-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Feature Engineering Pipeline</div>
+          <div class="panel-sub">47 features across 6 groups · Spark SQL + Python</div>
+        </div>
+        <div class="feature-groups" id="feature-groups"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Feature Importance</div>
+          <div class="panel-sub">SHAP-based importance for NYC-DC1 model</div>
+        </div>
+        <div style="height:340px;position:relative"><canvas id="featureImportanceChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─── Data Engine ────────────────────────────────────────────────────────────
+const SITES = [
+  { id: "NYC-DC1", capacity: 100, tz: "UTC-5", region: "North America" },
+  { id: "LON-DC2", capacity: 80,  tz: "UTC+0", region: "EMEA" },
+  { id: "SYD-DC3", capacity: 60,  tz: "UTC+11", region: "APAC" },
+  { id: "TKY-DC4", capacity: 70,  tz: "UTC+9",  region: "APAC" },
+  { id: "SFO-DC5", capacity: 90,  tz: "UTC-8",  region: "North America" },
+];
+
+let activeSite = "NYC-DC1";
+let activeHorizon = 24;
+let chartInstances = {};
+let tickInterval, dataInterval;
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function randi(min, max) { return Math.floor(rand(min, max)); }
+
+function getHourFactor(h, dow) {
+  const biz = (h >= 9 && h < 18 && dow < 5) ? Math.sin(Math.PI * (h - 8) / 10) * 0.6 : 0;
+  const eve = (h >= 18 && h < 23) ? Math.sin(Math.PI * (h - 18) / 8) * 0.3 : 0;
+  const wkd = (dow >= 5) ? 0.4 : 1.0;
+  return (0.25 + biz + eve) * wkd;
+}
+
+function generateSiteData(site, hoursBack = 96, hoursForward = 168) {
+  const cap = site.capacity;
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+  const points = [];
+  const seedOff = SITES.indexOf(site) * 17;
+
+  for (let i = -hoursBack; i < hoursForward; i++) {
+    const ts = new Date(now.getTime() + i * 3600000);
+    const h = ts.getHours();
+    const dow = ts.getDay();
+    const isForecast = i >= 0;
+    let util = getHourFactor(h, dow) + rand(-0.04, 0.04);
+    util = Math.max(0.05, Math.min(0.95, util + seedOff * 0.001));
+    const gbps = util * cap;
+    const ci = isForecast ? gbps * rand(0.08, 0.14) : 0;
+    points.push({
+      ts, isForecast, util,
+      gbps: +gbps.toFixed(2),
+      lower: isForecast ? +(gbps - 1.96 * ci).toFixed(2) : null,
+      upper: isForecast ? +(gbps + 1.96 * ci).toFixed(2) : null,
+      latency: +(5 + util * 45 + rand(0, 5)).toFixed(1),
+      pktLoss: +(Math.max(0, (util - 0.7) * 5 + rand(0, 0.2))).toFixed(3),
+      jitter: +(0.5 + util * 8 + rand(0, 2)).toFixed(1),
+      sessions: randi(util * 20000, util * 60000),
+      isAnomaly: Math.random() < 0.015,
+    });
+  }
+  return points;
+}
+
+function getCurrentKPI(site) {
+  const h = new Date().getHours();
+  const dow = new Date().getDay();
+  const util = getHourFactor(h, dow) + rand(-0.04, 0.04) + SITES.indexOf(site) * 0.03;
+  const u = Math.max(0.05, Math.min(0.95, util));
+  const cap = site.capacity;
+  const gbps = u * cap;
+  const prevGbps = gbps * rand(0.88, 0.95);
+  return {
+    gbps: +gbps.toFixed(2),
+    utilPct: +(u * 100).toFixed(1),
+    latency: +(5 + u * 45 + rand(0, 5)).toFixed(1),
+    pktLoss: +(Math.max(0, (u - 0.7) * 5 + rand(0, 0.2))).toFixed(3),
+    sessions: randi(u * 20000, u * 60000),
+    jitter: +(0.5 + u * 8 + rand(0, 2)).toFixed(1),
+    prevGbps: +prevGbps.toFixed(2),
+    risk: u > 0.80 ? "HIGH" : u > 0.65 ? "MEDIUM" : "LOW",
+  };
+}
+
+// Traffic mix per hour
+function getTrafficMix(util) {
+  const v = Math.min(1, util + 0.1);
+  return [
+    { label: "HTTPS", pct: +(40 + rand(-3,3)).toFixed(1), color: "#3B82F6" },
+    { label: "Video", pct: +(20 + v*10 + rand(-2,2)).toFixed(1), color: "#8B5CF6" },
+    { label: "HTTP", pct: +(15 + rand(-2,2)).toFixed(1), color: "#06B6D4" },
+    { label: "VPN", pct: +(12 + rand(-2,2)).toFixed(1), color: "#10B981" },
+    { label: "DB", pct: +(8 + rand(-1,1)).toFixed(1), color: "#F59E0B" },
+    { label: "DNS", pct: +(5 + rand(-1,1)).toFixed(1), color: "#6B7280" },
+  ];
+}
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let allSiteData = {};
+SITES.forEach(s => { allSiteData[s.id] = generateSiteData(s); });
+
+// ─── Clock ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById("clock").textContent =
+    now.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// ─── Site Tabs ───────────────────────────────────────────────────────────────
+function renderSiteTabs() {
+  const container = document.getElementById("site-tabs");
+  container.innerHTML = SITES.map(s => {
+    const kpi = getCurrentKPI(s);
+    const badgeColor = kpi.risk === "HIGH" ? "#EF4444" : kpi.risk === "MEDIUM" ? "#F59E0B" : "#10B981";
+    const badgeBg = kpi.risk === "HIGH" ? "rgba(239,68,68,0.12)" : kpi.risk === "MEDIUM" ? "rgba(245,158,11,0.12)" : "rgba(16,185,129,0.12)";
+    return `<div class="site-tab ${s.id === activeSite ? 'active' : ''}" onclick="selectSite('${s.id}')">
+      <span>${s.id}</span>
+      <span class="site-util-badge" style="color:${badgeColor};background:${badgeBg}">${kpi.utilPct}%</span>
+    </div>`;
+  }).join('');
+}
+
+function selectSite(siteId) {
+  activeSite = siteId;
+  renderSiteTabs();
+  renderKPICards();
+  renderTrafficMix();
+  refreshChart('trafficChart');
+}
+
+// ─── KPI Cards ───────────────────────────────────────────────────────────────
+function renderKPICards() {
+  const site = SITES.find(s => s.id === activeSite);
+  const kpi = getCurrentKPI(site);
+  const data = allSiteData[activeSite];
+  const recent12 = data.filter(p => !p.isForecast).slice(-12).map(p => p.gbps);
+
+  const deltaGbps = ((kpi.gbps - kpi.prevGbps) / kpi.prevGbps * 100).toFixed(1);
+  const deltaDir = deltaGbps > 0 ? "up" : "down";
+
+  const cards = [
+    {
+      label: "TOTAL TRAFFIC", value: kpi.gbps + " Gbps",
+      sub: `of ${site.capacity} Gbps capacity`,
+      delta: deltaGbps + "%", deltaDir, accent: "#3B82F6",
+    },
+    {
+      label: "UTILIZATION", value: kpi.utilPct + "%",
+      sub: `Risk: ${kpi.risk}`,
+      delta: (kpi.utilPct > 80 ? "▲ HIGH" : "▼ OK"), deltaDir: kpi.utilPct > 80 ? "up" : "neutral",
+      accent: kpi.utilPct > 80 ? "#EF4444" : kpi.utilPct > 65 ? "#F59E0B" : "#10B981",
+    },
+    {
+      label: "AVG LATENCY", value: kpi.latency + " ms",
+      sub: "P95 SLA: 50ms",
+      delta: kpi.latency > 35 ? "SLA WARN" : "▼ NOMINAL", deltaDir: kpi.latency > 35 ? "up" : "neutral",
+      accent: kpi.latency > 35 ? "#F59E0B" : "#10B981",
+    },
+    {
+      label: "PACKET LOSS", value: kpi.pktLoss + "%",
+      sub: "Threshold: 0.1%",
+      delta: kpi.pktLoss > 0.1 ? "ABOVE THRESH" : "NOMINAL", deltaDir: kpi.pktLoss > 0.1 ? "up" : "neutral",
+      accent: kpi.pktLoss > 0.1 ? "#EF4444" : "#10B981",
+    },
+    {
+      label: "ACTIVE SESSIONS", value: kpi.sessions.toLocaleString(),
+      sub: "concurrent flows",
+      delta: "+2.3% vs 1h ago", deltaDir: "up", accent: "#8B5CF6",
+    },
+    {
+      label: "JITTER", value: kpi.jitter + " ms",
+      sub: "VoIP SLA: <10ms",
+      delta: kpi.jitter > 10 ? "SLA BREACH" : "NOMINAL", deltaDir: kpi.jitter > 10 ? "up" : "neutral",
+      accent: kpi.jitter > 10 ? "#EF4444" : "#06B6D4",
+    },
+  ];
+
+  const container = document.getElementById("kpi-grid");
+  container.innerHTML = cards.map((c, i) => `
+    <div class="kpi-card" style="--card-accent:${c.accent}">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value" style="color:${c.accent}">${c.value}</div>
+      <div class="kpi-sub">
+        <span class="kpi-delta ${c.deltaDir}">${c.delta}</span>
+        <span style="color:var(--text3)">· ${c.sub}</span>
+      </div>
+      <div class="kpi-sparkline">
+        <canvas id="spark-${i}" height="32"></canvas>
+      </div>
+    </div>
+  `).join('');
+
+  // Render sparklines
+  cards.forEach((c, i) => {
+    const ctx = document.getElementById(`spark-${i}`).getContext('2d');
+    const sparkData = recent12.map(v => c.label === "UTILIZATION" ? v / site.capacity * 100 :
+                                        c.label === "TOTAL TRAFFIC" ? v : v * rand(0.9,1.1));
+    destroyChart(`spark-${i}`);
+    chartInstances[`spark-${i}`] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: sparkData.map((_,j) => j),
+        datasets: [{ data: sparkData, borderColor: c.accent, borderWidth: 1.5, pointRadius: 0,
+          fill: true, backgroundColor: c.accent + '18', tension: 0.4 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { x: { display: false }, y: { display: false } }, animation: false }
+    });
+  });
+}
+
+// ─── Traffic Mix ────────────────────────────────────────────────────────────
+function renderTrafficMix() {
+  const site = SITES.find(s => s.id === activeSite);
+  const kpi = getCurrentKPI(site);
+  const mix = getTrafficMix(kpi.utilPct / 100);
+  const container = document.getElementById("traffic-mix");
+  container.innerHTML = mix.map(m => `
+    <div class="mix-row">
+      <div class="mix-label">${m.label}</div>
+      <div class="mix-bar-wrap"><div class="mix-bar" style="width:${m.pct}%;background:${m.color}"></div></div>
+      <div class="mix-pct">${m.pct}%</div>
+    </div>
+  `).join('');
+
+  // Donut chart
+  destroyChart('trafficDonut');
+  chartInstances['trafficDonut'] = new Chart(
+    document.getElementById('trafficDonut').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: mix.map(m => m.label), datasets: [{ data: mix.map(m => m.pct), backgroundColor: mix.map(m => m.color), borderColor: '#0D1320', borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '72%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}%` } } } }
+  });
+}
+
+// ─── Sites Table ─────────────────────────────────────────────────────────────
+function renderSitesTable() {
+  const tbody = document.getElementById("sites-tbody");
+  tbody.innerHTML = SITES.map(s => {
+    const k = getCurrentKPI(s);
+    const pct = k.utilPct;
+    const fillColor = pct > 80 ? "#EF4444" : pct > 65 ? "#F59E0B" : "#10B981";
+    return `<tr>
+      <td><strong>${s.id}</strong> <span style="color:var(--text3);font-size:10px">· ${s.region}</span></td>
+      <td>${k.gbps} Gbps</td>
+      <td>
+        <div class="util-bar-wrap">
+          <div class="util-bar"><div class="util-fill" style="width:${pct}%;background:${fillColor}"></div></div>
+          <span style="font-size:11px;font-family:var(--font-mono)">${pct}%</span>
+        </div>
+      </td>
+      <td>${k.latency} ms</td>
+      <td>${k.pktLoss}%</td>
+      <td>${k.sessions.toLocaleString()}</td>
+      <td><span class="status-badge status-${k.risk}">${k.risk}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Anomaly Feed ────────────────────────────────────────────────────────────
+function renderAnomalyFeed() {
+  const anomalies = [
+    { site: "NYC-DC1", type: "ddos", time: "14 min ago", desc: "Sudden spike +340% above baseline", gbps: "94.2" },
+    { site: "LON-DC2", type: "maintenance", time: "2h 11m ago", desc: "Scheduled maintenance window", gbps: "12.3" },
+    { site: "SYD-DC3", type: "ddos", time: "5h 44m ago", desc: "SYN flood detected, BGP re-routed", gbps: "58.9" },
+    { site: "TKY-DC4", type: "ddos", time: "11h ago", desc: "Traffic spike — rate-limited", gbps: "67.1" },
+    { site: "SFO-DC5", type: "maintenance", time: "18h ago", desc: "Firmware upgrade — planned", gbps: "8.4" },
+  ];
+  document.getElementById("anomaly-count").textContent = anomalies.length;
+  document.getElementById("anomaly-list").innerHTML = anomalies.map(a => `
+    <div class="anomaly-item ${a.type === 'maintenance' ? 'maintenance' : ''}">
+      <div class="anomaly-icon">${a.type === 'ddos' ? '⚡' : '🔧'}</div>
+      <div class="anomaly-body">
+        <div class="anomaly-title">${a.site} — ${a.type === 'ddos' ? 'Traffic Anomaly' : 'Maintenance'}</div>
+        <div class="anomaly-detail">${a.time} · ${a.gbps} Gbps · ${a.desc}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── Traffic + Forecast Chart ─────────────────────────────────────────────────
+function buildTrafficChart() {
+  const data = allSiteData[activeSite];
+  const site = SITES.find(s => s.id === activeSite);
+  const histPoints = data.filter(p => !p.isForecast).slice(-72);
+  const fcPoints = data.filter(p => p.isForecast).slice(0, activeHorizon);
+  const allPoints = [...histPoints, ...fcPoints];
+
+  const labels = allPoints.map(p => {
+    const h = p.ts.getHours();
+    return p.ts.getHours() === 0 ? p.ts.toLocaleDateString('en', {month:'short',day:'numeric'}) :
+           (h % 6 === 0 ? `${h}:00` : '');
+  });
+  const splitIdx = histPoints.length;
+
+  destroyChart('trafficChart');
+  chartInstances['trafficChart'] = new Chart(
+    document.getElementById('trafficChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Actual', data: allPoints.map((p,i) => i < splitIdx ? p.gbps : null),
+          borderColor: '#3B82F6', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false },
+        { label: 'Forecast', data: allPoints.map((p,i) => i >= splitIdx - 1 ? p.gbps : null),
+          borderColor: '#6366F1', borderWidth: 2, pointRadius: 0, tension: 0.3, borderDash: [6,3], fill: false },
+        { label: 'Upper CI', data: allPoints.map((p,i) => i >= splitIdx - 1 ? p.upper : null),
+          borderColor: 'rgba(99,102,241,0)', fill: '+1', backgroundColor: 'rgba(99,102,241,0.08)', pointRadius: 0, tension: 0.3 },
+        { label: 'Lower CI', data: allPoints.map((p,i) => i >= splitIdx - 1 ? p.lower : null),
+          borderColor: 'rgba(99,102,241,0)', fill: false, pointRadius: 0, tension: 0.3 },
+        { label: 'Capacity', data: allPoints.map(() => site.capacity),
+          borderColor: '#EF4444', borderWidth: 1, borderDash: [4,4], pointRadius: 0, fill: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        mode: 'index', intersect: false,
+        callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw?.toFixed(1)} Gbps` }
+      }},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 }, maxRotation: 0 } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 }, callback: v => v + ' G' } }
+      },
+      interaction: { mode: 'index', intersect: false },
+    }
+  });
+}
+
+// ─── Forecast View Charts ─────────────────────────────────────────────────────
+function buildForecastCharts() {
+  // Multi-site 7d
+  const colors = { "NYC-DC1": "#3B82F6", "LON-DC2": "#10B981", "SYD-DC3": "#F59E0B", "TKY-DC4": "#8B5CF6", "SFO-DC5": "#06B6D4" };
+  const fcLabels = Array.from({length: 168}, (_,i) => {
+    const d = new Date(Date.now() + i * 3600000);
+    return d.getHours() === 0 ? d.toLocaleDateString('en', {month:'short',day:'numeric'}) : (d.getHours() % 24 === 12 ? '12:00' : '');
+  });
+
+  destroyChart('multiSiteChart');
+  chartInstances['multiSiteChart'] = new Chart(document.getElementById('multiSiteChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: fcLabels,
+      datasets: SITES.map(s => {
+        const fcData = allSiteData[s.id].filter(p => p.isForecast).slice(0, 168).map(p => p.gbps);
+        return { label: s.id, data: fcData, borderColor: colors[s.id], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false };
+      })
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#8B96AD', font: { size: 11 }, boxWidth: 12 } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 }, maxRotation: 0 } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 } } }
+      }
+    }
+  });
+
+  // Peak hour 24h
+  const hours24 = Array.from({length: 24}, (_,i) => {
+    const d = new Date(Date.now() + i * 3600000);
+    return d.getHours() + ':00';
+  });
+  const peakData = allSiteData[activeSite].filter(p => p.isForecast).slice(0, 24).map(p => p.gbps);
+  const lower24 = allSiteData[activeSite].filter(p => p.isForecast).slice(0, 24).map(p => p.lower);
+  const upper24 = allSiteData[activeSite].filter(p => p.isForecast).slice(0, 24).map(p => p.upper);
+
+  destroyChart('peakHourChart');
+  chartInstances['peakHourChart'] = new Chart(document.getElementById('peakHourChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: hours24,
+      datasets: [
+        { label: 'Forecast', data: peakData, backgroundColor: 'rgba(99,102,241,0.5)', borderColor: '#6366F1', borderWidth: 1 },
+        { label: 'Upper CI', data: upper24, type: 'line', borderColor: 'rgba(99,102,241,0.4)', borderWidth: 1, pointRadius: 0, fill: '-1', backgroundColor: 'rgba(99,102,241,0.05)' },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#4E5A6E', font: { size: 9 }, maxRotation: 45 } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 } } }
+      }
+    }
+  });
+
+  // Accuracy chart
+  const mapes = { "NYC-DC1": [3.1, 4.2, 5.8, 7.3, 9.1], "LON-DC2": [2.9, 4.0, 5.5, 7.1, 8.9], "SYD-DC3": [3.5, 4.8, 6.2, 8.0, 10.2], "TKY-DC4": [3.3, 4.5, 6.0, 7.8, 9.9], "SFO-DC5": [2.8, 3.9, 5.3, 6.9, 8.7] };
+  const horizons = ['1h', '6h', '24h', '72h', '168h'];
+  destroyChart('accuracyChart');
+  chartInstances['accuracyChart'] = new Chart(document.getElementById('accuracyChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: horizons,
+      datasets: SITES.map(s => ({ label: s.id, data: mapes[s.id], backgroundColor: colors[s.id] + '80', borderColor: colors[s.id], borderWidth: 1 }))
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#8B96AD', font: { size: 10 }, boxWidth: 10 } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#4E5A6E', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 }, callback: v => v + '%' }, title: { display: true, text: 'MAPE (%)', color: '#4E5A6E', font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ─── Models View ──────────────────────────────────────────────────────────────
+function buildModelsView() {
+  const models = [
+    { site: "NYC-DC1", order: "(1,1,1)", seasonal: "(1,1,1)24", rmse: 3.21, mape: 3.1, aic: -2341, obs: 4320, status: "FITTED" },
+    { site: "LON-DC2", order: "(1,1,1)", seasonal: "(1,1,1)24", rmse: 2.87, mape: 2.9, aic: -2198, obs: 4320, status: "FITTED" },
+    { site: "SYD-DC3", order: "(2,1,1)", seasonal: "(1,1,1)24", rmse: 2.41, mape: 3.5, aic: -1876, obs: 4320, status: "FITTED" },
+    { site: "TKY-DC4", order: "(1,1,2)", seasonal: "(1,1,1)24", rmse: 2.63, mape: 3.3, aic: -2012, obs: 4320, status: "FITTED" },
+    { site: "SFO-DC5", order: "(1,1,1)", seasonal: "(1,1,1)24", rmse: 2.78, mape: 2.8, aic: -2256, obs: 4320, status: "FITTED" },
+  ];
+  const colors = { "NYC-DC1": "#3B82F6", "LON-DC2": "#10B981", "SYD-DC3": "#F59E0B", "TKY-DC4": "#8B5CF6", "SFO-DC5": "#06B6D4" };
+  document.getElementById("model-grid").innerHTML = models.map(m => `
+    <div class="model-card">
+      <div class="model-site">${m.site}</div>
+      <div class="model-stat"><span class="model-stat-label">Order</span><span class="model-stat-val">${m.order}</span></div>
+      <div class="model-stat"><span class="model-stat-label">Seasonal</span><span class="model-stat-val">${m.seasonal}</span></div>
+      <div class="model-stat"><span class="model-stat-label">RMSE</span><span class="model-stat-val">${m.rmse} Gbps</span></div>
+      <div class="model-stat"><span class="model-stat-label">MAPE</span><span class="model-stat-val">${m.mape}%</span></div>
+      <div class="model-stat"><span class="model-stat-label">AIC</span><span class="model-stat-val">${m.aic}</span></div>
+      <div class="model-stat"><span class="model-stat-label">N obs</span><span class="model-stat-val">${m.obs.toLocaleString()}</span></div>
+    </div>
+  `).join('');
+
+  // Scatter: RMSE vs MAPE
+  destroyChart('modelScatterChart');
+  chartInstances['modelScatterChart'] = new Chart(document.getElementById('modelScatterChart').getContext('2d'), {
+    type: 'bubble',
+    data: {
+      datasets: models.map(m => ({
+        label: m.site,
+        data: [{ x: m.mape, y: m.rmse, r: 14 }],
+        backgroundColor: colors[m.site] + '80', borderColor: colors[m.site], borderWidth: 2,
+      }))
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#8B96AD', font: { size: 11 }, boxWidth: 10 } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 }, callback: v => v + '%' }, title: { display: true, text: 'MAPE (%)', color: '#4E5A6E' } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 } }, title: { display: true, text: 'RMSE (Gbps)', color: '#4E5A6E' }, min: 0, max: 6 }
+      }
+    }
+  });
+
+  // Residuals
+  const residuals = Array.from({length: 168}, () => rand(-6, 6) + rand(-2, 2));
+  destroyChart('residualChart');
+  chartInstances['residualChart'] = new Chart(document.getElementById('residualChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: residuals.map((_,i) => i % 24 === 0 ? `${i}h` : ''),
+      datasets: [{ label: 'Residual', data: residuals, backgroundColor: residuals.map(v => v > 0 ? 'rgba(59,130,246,0.6)' : 'rgba(239,68,68,0.6)'), borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#4E5A6E', font: { size: 9 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 }, callback: v => v + ' G' } }
+      }
+    }
+  });
+}
+
+// ─── Anomalies View ───────────────────────────────────────────────────────────
+function buildAnomaliesView() {
+  const sites = SITES.map(s => s.id);
+  const colors = { "NYC-DC1": "#3B82F6", "LON-DC2": "#10B981", "SYD-DC3": "#F59E0B", "TKY-DC4": "#8B5CF6", "SFO-DC5": "#06B6D4" };
+  const hours = Array.from({length: 30 * 24}, (_,i) => i);
+  const labels = hours.filter(h => h % 24 === 0).map(h => `Day ${Math.floor(h/24)+1}`);
+
+  // For anomaly timeline, show anomaly counts per day per site
+  const dailyAnomalies = SITES.map(s => Array.from({length: 30}, () => randi(0, 4)));
+
+  destroyChart('anomalyTimelineChart');
+  chartInstances['anomalyTimelineChart'] = new Chart(document.getElementById('anomalyTimelineChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: Array.from({length: 30}, (_,i) => `D${i+1}`),
+      datasets: SITES.map((s,i) => ({ label: s.id, data: dailyAnomalies[i], backgroundColor: colors[s.id] + '80', borderColor: colors[s.id], borderWidth: 1, stack: 'anomalies' }))
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#8B96AD', font: { size: 10 }, boxWidth: 10 } } },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { color: '#4E5A6E', font: { size: 9 } } },
+        y: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 } }, title: { display: true, text: 'Anomaly count', color: '#4E5A6E', font: { size: 10 } } }
+      }
+    }
+  });
+
+  destroyChart('anomalyTypeChart');
+  chartInstances['anomalyTypeChart'] = new Chart(document.getElementById('anomalyTypeChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: ['DDoS/Spike', 'Maintenance', 'BGP Flap', 'Hardware', 'Unknown'],
+      datasets: [{ data: [42, 28, 15, 9, 6], backgroundColor: ['#EF4444', '#F59E0B', '#8B5CF6', '#06B6D4', '#6B7280'], borderColor: '#0D1320', borderWidth: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { position: 'right', labels: { color: '#8B96AD', font: { size: 11 }, boxWidth: 12, padding: 12 } } }
+    }
+  });
+}
+
+// ─── Features View ────────────────────────────────────────────────────────────
+function buildFeaturesView() {
+  const groups = [
+    { name: "Temporal & Cyclical", count: 16, color: "#3B82F6", desc: "hour, dow, month, sin/cos encodings" },
+    { name: "Lag Features", count: 8, color: "#10B981", desc: "1h, 2h, 3h, 6h, 12h, 24h, 48h, 168h" },
+    { name: "Rolling Statistics", count: 9, color: "#8B5CF6", desc: "mean/std/max/min over 3h, 6h, 24h, 168h" },
+    { name: "Derived KPIs", count: 7, color: "#F59E0B", desc: "headroom, TII, quality score, congestion risk" },
+    { name: "Cross-Site Signals", count: 3, color: "#06B6D4", desc: "rank, relative-to-avg, correlation index" },
+    { name: "Anomaly Indicators", count: 5, color: "#EF4444", desc: "z-score 1h/24h, IQR flag, spike/sustained flags" },
+  ];
+  const maxCount = Math.max(...groups.map(g => g.count));
+  document.getElementById("feature-groups").innerHTML = groups.map(g => `
+    <div class="feature-group">
+      <div style="flex:1">
+        <div class="fg-label" style="color:${g.color}">${g.name}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${g.desc}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="fg-bar-wrap"><div class="fg-bar" style="width:${g.count/maxCount*100}%;background:${g.color}"></div></div>
+        <div class="fg-count">${g.count}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Feature importance (SHAP)
+  const features = ['lag_24h', 'roll_mean_24h', 'lag_168h', 'hour_sin', 'lag_1h', 'is_business_hour', 'roll_std_24h', 'hour_cos', 'dow_sin', 'traffic_growth_rate'];
+  const shap = [0.312, 0.241, 0.198, 0.156, 0.143, 0.121, 0.089, 0.076, 0.064, 0.052];
+  const featureColors = ['#3B82F6','#3B82F6','#10B981','#8B5CF6','#3B82F6','#F59E0B','#3B82F6','#8B5CF6','#8B5CF6','#EF4444'];
+
+  destroyChart('featureImportanceChart');
+  chartInstances['featureImportanceChart'] = new Chart(document.getElementById('featureImportanceChart').getContext('2d'), {
+    type: 'bar',
+    indexAxis: 'y',
+    data: {
+      labels: features,
+      datasets: [{ label: 'SHAP value', data: shap, backgroundColor: featureColors.map(c => c + '80'), borderColor: featureColors, borderWidth: 1 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4E5A6E', font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { color: '#8B96AD', font: { size: 11, family: "'IBM Plex Mono'" } } }
+      }
+    }
+  });
+}
+
+// ─── Chart utility ────────────────────────────────────────────────────────────
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+function refreshChart(id) {
+  if (id === 'trafficChart') buildTrafficChart();
+}
+
+// ─── Horizon selector ────────────────────────────────────────────────────────
+function setHorizon(h, btn) {
+  activeHorizon = h;
+  document.querySelectorAll('.h-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  buildTrafficChart();
+}
+
+// ─── View switcher ────────────────────────────────────────────────────────────
+function switchView(view, btn) {
+  ['dashboard','forecast','models','anomalies','features'].forEach(v => {
+    document.getElementById(`view-${v}`).style.display = v === view ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Build view-specific charts
+  if (view === 'forecast') buildForecastCharts();
+  if (view === 'models') buildModelsView();
+  if (view === 'anomalies') buildAnomaliesView();
+  if (view === 'features') buildFeaturesView();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+function init() {
+  renderSiteTabs();
+  renderKPICards();
+  renderTrafficMix();
+  renderSitesTable();
+  renderAnomalyFeed();
+  buildTrafficChart();
+}
+
+// ─── Auto-refresh (simulates real-time) ───────────────────────────────────────
+setInterval(() => {
+  SITES.forEach(s => { allSiteData[s.id] = generateSiteData(s); });
+  renderSiteTabs();
+  renderKPICards();
+  renderTrafficMix();
+  renderSitesTable();
+  renderAnomalyFeed();
+  buildTrafficChart();
+}, 30000); // 30s refresh
+
+init();
+</script>
+</body>
+</html>
