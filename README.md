@@ -13,7 +13,7 @@
 
 ## Live Demo
 
-**[View Dashboard →](https://saanikapatil08.github.io/Network-Traffic-Forecasting-KPI-Platform/)**
+<!--**[View Dashboard →](https://saanikapatil08.github.io/Network-Traffic-Forecasting-KPI-Platform/)**-->
 
 > No installation needed — opens directly in your browser.
 
@@ -204,7 +204,7 @@ API docs available at `http://localhost:8000/docs`
 ```bash
 open dashboard/index.html
 ```
-Or visit the live version: **[GitHub Pages →](https://saanikapatil08.github.io/Network-Traffic-Forecasting-KPI-Platform/)**
+<!---Or visit the live version: **[GitHub Pages →](https://saanikapatil08.github.io/Network-Traffic-Forecasting-KPI-Platform/)**-->
 
 ### 4. Run the forecasting engine standalone
 ```bash
